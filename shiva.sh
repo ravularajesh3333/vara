@@ -1,1 +1,1 @@
-echo "Hello Shiva Durga"
+echo "Hello Shiva Durgas"
