@@ -1,0 +1,63 @@
+pipeline {
+    agent any
+
+    environment {
+        GIT_CREDENTIALS_ID_PRIMARY = 'github-primary-credentials'
+        GIT_CREDENTIALS_ID_SECONDARY = 'github-secondary-credentials'
+        SOURCE_REPO = 'https://github.com/ravularajesh/raj.git'
+        DEST_REPO = 'https://github.com/ravularajesh3333/vara.git'
+    }
+
+    stages {
+
+        stage('Debug Information') {
+            steps {
+                script {
+                    echo "Repository URL: ${env.SOURCE_REPO}, credentialsId: ${env.GIT_CREDENTIALS_ID_PRIMARY}"
+                    echo "Repository URL: ${env.DEST_REPO}, credentialsId: ${env.GIT_CREDENTIALS_ID_SECONDARY}"
+                }
+            }
+        }
+
+        stage('Clone Source Repository') {
+            steps {
+                script {
+                    try {
+                        echo 'Cloning the source repository'  
+                        git url: env.SOURCE_REPO, credentialsId: env.GIT_CREDENTIALS_ID_PRIMARY
+                    } catch (Exception e) {
+                        echo 'Unable to clone source repository'
+                    }
+                }
+            }
+        }
+        
+        stage('Clone Destination Repository') {
+            steps {
+                dir('../vara') {
+                    git url: env.DEST_REPO, credentialsId: env.GIT_CREDENTIALS_ID_SECONDARY
+                }
+            }
+        }
+
+        stage('Copy Files') {
+            steps {
+                script {
+                    sh 'cp -r * ../vara'
+                }
+            }
+        }
+
+        
+
+        stage('Push Files to Destination Repo') {
+            steps {
+                dir('../vara') {
+                    sh 'git add .'
+                    sh 'git commit -m "vara is added"'
+                    sh 'git push origin var'
+                }
+            }
+        }
+    }
+}
