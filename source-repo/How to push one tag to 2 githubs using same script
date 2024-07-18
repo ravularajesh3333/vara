@@ -1,0 +1,70 @@
+pipeline {
+    agent any
+    
+    environment {
+        GIT_URL = 'https://github.com/ravularajesh/raj.git'
+        GIT_URL_SECONDARY = 'https://github.com/ravularajesh3333/vara.git'
+        GIT_CREDENTIALS_ID_PRIMARY = 'github-primary-credentials'
+        GIT_CREDENTIALS_ID_SECONDARY = 'github-secondary-credentials'
+        TAG_NAME = "v1.0.1"
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    git branch: 'master', credentialsId: "${env.GIT_CREDENTIALS_ID_PRIMARY}", url: "${env.GIT_URL}"
+                    git branch: 'var', credentialsId: "${env.GIT_CREDENTIALS_ID_SECONDARY}", url: "${env.GIT_URL_SECONDARY}"
+                }
+            }
+        }
+        
+        stage('Create Tag') {
+            steps {
+                script {
+                    sh "git tag ${env.TAG_NAME}"
+                }
+            }
+        }
+        
+        stage('Verify Tag') {
+            steps {
+                script {
+                    sh "git show ${env.TAG_NAME}"
+                }
+            }
+        }
+        
+        stage('Push Tag to Primary Repository') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: "${env.GIT_CREDENTIALS_ID_PRIMARY}", usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                        sh "git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/ravularajesh/raj.git"
+                        sh "git push origin ${env.TAG_NAME}"
+                    }
+                }
+            }
+        }
+        
+        stage('Push Tag to Secondary Repository') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: "${env.GIT_CREDENTIALS_ID_SECONDARY}", usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                        sh "git remote add secondary https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/ravularajesh3333/vara.git"
+                        sh "git push secondary ${env.TAG_NAME}"
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        failure {
+            script {
+                sh 'git remote -v'
+                sh 'git branch -vv'
+                sh 'git tag -l'
+            }
+        }
+    }
+}
