@@ -1,0 +1,97 @@
+pipeline {
+    agent any
+    environment {
+        SOURCE_URL = 'https://github.com/ravularajesh/raj.git'
+        DEST_URL = 'https://github.com/ravularajesh3333/vara.git'
+        GIT_CREDENTIALS_ID_PRIMARY = 'primary-repo-url'
+        GIT_CREDENTIALS_ID_SECONDARY = 'destination-repo-url'
+        TAG_NAME = "v1.0.63"  
+    }
+
+    stages {
+        stage('Clone Source Repo') {
+            steps {
+                script {
+                    git branch: 'veer', credentialsId: "${env.GIT_CREDENTIALS_ID_PRIMARY}", url: "${env.SOURCE_URL}"
+                }
+            }
+        }
+
+        stage('Create Tag') {
+            steps {
+                script {
+                    def existingTag = sh(script: "git tag -l ${TAG_NAME}", returnStdout: true).trim()
+                    if (existingTag.isEmpty()) {
+                        sh "git tag ${TAG_NAME}"
+                    } else {
+                        echo 'Tag already exists locally'
+                    }
+                }
+            }
+        }
+
+        stage('Verify Tag') {
+            steps {
+                sh "git show ${TAG_NAME} --name-only"
+            }
+        }
+
+        stage('Push Tag to Source Repository') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: "${env.GIT_CREDENTIALS_ID_PRIMARY}", usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                    script {
+                        sh "git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@${env.SOURCE_URL.replace('https://', '')}"
+                        sh "git fetch origin veer"
+                            sh "git checkout veer"
+                        def tagExists = sh(script: "git ls-remote --tags origin | grep refs/tags/${TAG_NAME}", returnStatus: true)
+                        if (tagExists != 0) {
+                            sh "git push origin ${TAG_NAME} veer"
+                        } else {
+                            echo "Tag ${TAG_NAME} already exists in the source repository"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Clone Source Repo for Destination') {
+            steps {
+                script {
+                    dir('source-repo') {
+                        git branch: 'veer', credentialsId: "${env.GIT_CREDENTIALS_ID_PRIMARY}", url: "${env.SOURCE_URL}"
+                    }
+                }
+            }
+        }
+
+        stage('Push Tag to Destination Repository') {
+            steps {
+                script {
+                    dir('source-repo') {
+                        withCredentials([usernamePassword(credentialsId: "${env.GIT_CREDENTIALS_ID_SECONDARY}", usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                            sh "git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@${env.DEST_URL.replace('https://', '')}"
+                            
+                            sh "git fetch origin veera"
+                            sh "git checkout veera"
+                            def changes = sh(script: "git status --porcelain", returnStdout: true).trim()
+                            if (changes) {
+                                sh "git add ."
+                                sh "git commit -m 'Pushing files to destination repository'"
+                                
+                            } else {
+                                echo "No changes to commit"
+                            }
+
+                            def tagExists = sh(script: "git ls-remote --tags origin | grep refs/tags/${TAG_NAME}", returnStatus: true)
+                            if (tagExists != 0) {
+                                sh "git push origin ${TAG_NAME} veera"
+                            } else {
+                                echo "Tag ${TAG_NAME} already exists in the destination repository"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
